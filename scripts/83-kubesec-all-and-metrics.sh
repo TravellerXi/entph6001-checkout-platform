@@ -28,14 +28,27 @@ for d in $(kubectl -n shop get deploy -o jsonpath='{range .items[*]}{.metadata.n
   score=$(echo "$res" | grep -m1 '"score"' | grep -o '\-\?[0-9]\+')
   if [ -n "${score:-}" ]; then
     scored=$((scored+1))
-    passed=$(echo "$res" | grep -c '"selector"' || true)
-    printf '  %-18s score=%-5s rule hits=%s\n' "$d" "$score" "$passed"
+    # List the rules each workload FAILS, so the appendix table is evidenced rather than inferred.
+    advise=$(echo "$res" | awk '/"advise"/ { a=1 } a && /"id"/ { gsub(/[",]/,""); sub(/^ *id: */,""); printf "%s ", $0 }')
+    printf '  %-14s score=%-4s not satisfied: %s\n' "$d" "$score" "${advise:-none}"
   else
-    printf '  %-18s NO SCORE RETURNED\n' "$d"
+    printf '  %-14s NO SCORE RETURNED\n' "$d"
   fi
 done
 echo
 echo "  Deployments found: ${total}, scored: ${scored}"
+echo
+echo "  Note on SeccompAny: kubesec's selector for that rule is the deprecated annotation"
+echo "  container.seccomp.security.alpha.kubernetes.io/pod. Every workload here sets the"
+echo "  current field instead, so the rule is a false negative. Proof, straight from the API:"
+kubectl -n shop get deploy -o jsonpath='{range .items[*]}{"    "}{.metadata.name}{" seccompProfile="}{.spec.template.spec.securityContext.seccompProfile.type}{"\n"}{end}'
+
+echo
+echo "############ PART 1b: every pod's ServiceAccount, so 'no pod uses default' is evidenced"
+kubectl -n shop get pods -o custom-columns=POD:.metadata.name,SERVICEACCOUNT:.spec.serviceAccountName --no-headers \
+  | sed 's/^/  /'
+echo -n "  pods using the default ServiceAccount: "
+kubectl -n shop get pods -o jsonpath='{range .items[*]}{.spec.serviceAccountName}{"\n"}{end}' | grep -cx default || true
 
 echo
 echo "############ PART 2: /metrics captured from each application service"

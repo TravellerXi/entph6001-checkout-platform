@@ -54,7 +54,7 @@ sequenceDiagram
 | E6 | Trust tiers are enforced, not just drawn | `60-test-networkpolicy.sh` | `networkpolicy-*.log` |
 | E7 | Data survives pod replacement | `70-test-persistence.sh` | `persistence-*.log` |
 | E8 | Rollout safety, measured against a control group rather than asserted: 3.4% to 1.4% failures, **not zero** | `45-test-rolling-update-ab.sh` | `rolling-update-ab-*.log` |
-| E9 | Config and image security posture, with fixes verified | `80-security-audit.sh`, `81-trivy-v1-vs-v2.sh` | `security-audit-*.log`, `trivy-v1-vs-v2-*.log` |
+| E9 | Config and image security posture, with fixes verified | `80-security-audit.sh`, `81-trivy-v1-vs-v2.sh`, `82-trivy-v1-detail.sh`, `83-kubesec-all-and-metrics.sh` | `security-audit-*.log`, `trivy-v1-vs-v2-*.log`, `trivy-v1-detail-*.log`, `kubesec-all-workloads-*.log` |
 | E10 | Excess load is refused at the edge, protecting admitted requests | `55-test-ratelimit.sh` | `ratelimit-*.log` |
 | E11 | Readiness is a traffic gate: a not-Ready pod is withheld from the Service | `56-test-readiness-gate.sh` | `readiness-gate-*.log` |
 | E12 | A bad image cannot complete a rollout, and rollback restores service | `57-test-rollout-failure-recovery.sh` | `rollout-failure-recovery-*.log` |

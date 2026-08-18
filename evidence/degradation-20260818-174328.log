@@ -1,0 +1,56 @@
+================ PHASE 1: baseline (all dependencies healthy)
+{"status":"confirmed","degraded":false,"pricing":{"subtotal":100,"taxRate":0.23,"tax":23,"total":123},"stock":{"sku":1,"inStock":true,"confirmed":true},"requestId":"deg-baseline"}
+HTTP 200  total=0.009745s
+
+================ PHASE 2: inventory-fn scaled to zero (non-critical dependency lost)
+-- endpoints for inventory-svc:
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+ (empty means no backends)
+-- checkout request with inventory down:
+{"status":"accepted_pending_stock_confirmation","degraded":true,"degradedComponent":"inventory","pricing":{"subtotal":100,"taxRate":0.23,"tax":23,"total":123},"stock":{"sku":1,"inStock":null,"confirmed":false},"requestId":"deg-inventory-down"}
+HTTP 200  total=0.008458s
+
+================ PHASE 3: inventory-fn restored
+{"status":"confirmed","degraded":false,"pricing":{"subtotal":100,"taxRate":0.23,"tax":23,"total":123},"stock":{"sku":1,"inStock":true,"confirmed":true},"requestId":"deg-inventory-restored"}
+HTTP 200  total=0.025450s
+
+================ PHASE 4: pricing-fn made slow (3000ms > TIMEOUT_MS 1500ms)
+-- checkout request with pricing exceeding the timeout budget:
+{"error":"checkout unavailable","reason":"pricing_timeout","requestId":"deg-pricing-slow"}
+HTTP 503  total=1.505018s
+
+================ PHASE 5: pricing-fn latency removed
+{"status":"confirmed","degraded":false,"pricing":{"subtotal":100,"taxRate":0.23,"tax":23,"total":123},"stock":{"sku":1,"inStock":true,"confirmed":true},"requestId":"deg-recovered"}
+HTTP 200  total=0.022360s
+
+================ Correlated log evidence (checkout-fn)
+--- deg-baseline
+{"ts":"2026-08-18T17:43:28.899Z","level":"info","service":"checkout-fn","event":"dependency_call","request_id":"deg-baseline","dependency":"pricing","status":200,"duration_ms":5.8}
+{"ts":"2026-08-18T17:43:28.900Z","level":"info","service":"checkout-fn","event":"dependency_call","request_id":"deg-baseline","dependency":"inventory","status":200,"duration_ms":6.6}
+{"ts":"2026-08-18T17:43:28.901Z","level":"info","service":"checkout-fn","event":"http_request","request_id":"deg-baseline","method":"POST","route":"/checkout","status":200,"duration_ms":7.5}
+--- deg-inventory-down
+{"ts":"2026-08-18T17:44:00.670Z","level":"warn","service":"checkout-fn","event":"dependency_error","request_id":"deg-inventory-down","dependency":"inventory","error":"unreachable","duration_ms":3}
+{"ts":"2026-08-18T17:44:00.672Z","level":"info","service":"checkout-fn","event":"dependency_call","request_id":"deg-inventory-down","dependency":"pricing","status":200,"duration_ms":5.6}
+{"ts":"2026-08-18T17:44:00.672Z","level":"warn","service":"checkout-fn","event":"checkout_degraded","request_id":"deg-inventory-down","reason":"inventory_unreachable"}
+{"ts":"2026-08-18T17:44:00.674Z","level":"info","service":"checkout-fn","event":"http_request","request_id":"deg-inventory-down","method":"POST","route":"/checkout","status":200,"duration_ms":7}
+--- deg-pricing-slow
+{"ts":"2026-08-18T17:44:20.622Z","level":"info","service":"checkout-fn","event":"dependency_call","request_id":"deg-pricing-slow","dependency":"inventory","status":200,"duration_ms":11.2}
+{"ts":"2026-08-18T17:44:22.113Z","level":"warn","service":"checkout-fn","event":"dependency_error","request_id":"deg-pricing-slow","dependency":"pricing","error":"timeout","duration_ms":1502}
+{"ts":"2026-08-18T17:44:22.113Z","level":"error","service":"checkout-fn","event":"checkout_failed","request_id":"deg-pricing-slow","reason":"pricing_timeout"}
+{"ts":"2026-08-18T17:44:22.113Z","level":"info","service":"checkout-fn","event":"http_request","request_id":"deg-pricing-slow","method":"POST","route":"/checkout","status":503,"duration_ms":1502.5}
+--- deg-recovered
+{"ts":"2026-08-18T17:44:34.641Z","level":"info","service":"checkout-fn","event":"dependency_call","request_id":"deg-recovered","dependency":"inventory","status":200,"duration_ms":6.9}
+{"ts":"2026-08-18T17:44:34.652Z","level":"info","service":"checkout-fn","event":"dependency_call","request_id":"deg-recovered","dependency":"pricing","status":200,"duration_ms":19}
+{"ts":"2026-08-18T17:44:34.654Z","level":"info","service":"checkout-fn","event":"http_request","request_id":"deg-recovered","method":"POST","route":"/checkout","status":200,"duration_ms":20.6}
+
+================ Degradation counters
+--- pod/checkout-fn-5949488f54-5rj9c
+requests_total 87285
+errors_total 1
+dependency_failures_total 2
+degraded_responses_total 1
+--- pod/checkout-fn-5949488f54-t67dd
+requests_total 87270
+errors_total 0
+dependency_failures_total 0
+degraded_responses_total 0

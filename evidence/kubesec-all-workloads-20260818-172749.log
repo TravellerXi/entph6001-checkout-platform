@@ -1,0 +1,61 @@
+############ PART 1: kubesec, every Deployment scored separately
+The earlier audit piped whole manifests to 'scan /dev/stdin', which reads only the first
+YAML document. For 30-services.yaml that meant pricing-fn alone was ever scored.
+Here each Deployment is exported from the cluster and scored on its own, so the score
+describes what is actually running rather than what a file claims.
+
+  checkout-fn    score=12   not satisfied: ApparmorAny SeccompAny RunAsGroup RunAsUser 
+  gateway        score=12   not satisfied: ApparmorAny SeccompAny RunAsGroup RunAsUser 
+  inventory-fn   score=12   not satisfied: ApparmorAny SeccompAny RunAsGroup RunAsUser 
+  postgres       score=11   not satisfied: ApparmorAny SeccompAny RunAsGroup RunAsUser ReadOnlyRootFilesystem 
+  pricing-fn     score=12   not satisfied: ApparmorAny SeccompAny RunAsGroup RunAsUser 
+
+  Deployments found: 5, scored: 5
+
+  Note on SeccompAny: kubesec's selector for that rule is the deprecated annotation
+  container.seccomp.security.alpha.kubernetes.io/pod. Every workload here sets the
+  current field instead, so the rule is a false negative. Proof, straight from the API:
+    checkout-fn seccompProfile=RuntimeDefault
+    gateway seccompProfile=RuntimeDefault
+    inventory-fn seccompProfile=RuntimeDefault
+    postgres seccompProfile=RuntimeDefault
+    pricing-fn seccompProfile=RuntimeDefault
+
+############ PART 1b: every pod's ServiceAccount, so 'no pod uses default' is evidenced
+  checkout-fn-5949488f54-5rj9c    checkout-sa
+  checkout-fn-5949488f54-t67dd    checkout-sa
+  gateway-79744d5f8f-8mz8j        gateway-sa
+  gateway-79744d5f8f-vssk2        gateway-sa
+  inventory-fn-548b5bfb66-5brhf   inventory-sa
+  inventory-fn-548b5bfb66-w8kr7   inventory-sa
+  postgres-8bf8f9f9b-s8glh        postgres-sa
+  pricing-fn-84ddfd689b-hwg9d     pricing-sa
+  pricing-fn-84ddfd689b-wb5vt     pricing-sa
+  pods using the default ServiceAccount: 0
+
+############ PART 2: /metrics captured from each application service
+--- checkout-fn (pod checkout-fn-5949488f54-5rj9c) port 3003
+requests_total 87026
+errors_total 0
+dependency_failures_total 0
+degraded_responses_total 0
+
+--- pricing-fn (pod pricing-fn-84ddfd689b-hwg9d) port 3001
+requests_total 87011
+errors_total 0
+dependency_failures_total 0
+degraded_responses_total 0
+
+--- inventory-fn (pod inventory-fn-548b5bfb66-5brhf) port 3002
+requests_total 87025
+errors_total 0
+dependency_failures_total 0
+degraded_responses_total 0
+
+  The three counters differ, confirming three independent processes rather than one
+  endpoint answering three times. Totals are large because readiness probes poll /health.
+
+############ PART 3: the counter moves when real traffic flows
+  requests_total before: 87028
+  requests_total after : 87032
+  delta: 4 (two replicas share the load, and probes also increment)

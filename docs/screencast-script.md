@@ -60,8 +60,9 @@ Narrate each phase as it prints:
 ## 4:10–5:10 — A real defect, found, fixed, and honestly measured
 
 > "During development the smoke test intermittently returned 502, and the control group in the
-> experiment below reproduces it: terminating pods were still in the Service endpoints. I added a
-> preStop delay and a grace period."
+> experiment below reproduces it. The standard remedy is a preStop delay plus a grace period, so
+> that the endpoints controller removes the pod before it stops accepting connections; I applied
+> that and measured whether it helped."
 
 ```bash
 tail -20 evidence/rolling-update-ab-*.log

@@ -9,6 +9,7 @@ Re-running everything from nothing:
 ```bash
 bash scripts/deploy-all.sh          # build, deploy, wait for readiness
 bash scripts/30-smoke-test.sh       # Appendix A
+bash scripts/45-test-rolling-update-ab.sh   # Appendix C2
 bash scripts/50-test-degradation.sh # Appendix B
 bash scripts/55-test-ratelimit.sh   # Appendix C1
 bash scripts/56-test-readiness-gate.sh
@@ -19,6 +20,9 @@ bash scripts/60-test-networkpolicy.sh
 bash scripts/70-test-persistence.sh
 bash scripts/80-security-audit.sh
 bash scripts/81-trivy-v1-vs-v2.sh
+bash scripts/82-trivy-v1-detail.sh          # Appendix F, CVE attribution
+bash scripts/83-kubesec-all-and-metrics.sh  # Appendix F, per-workload scores
+bash scripts/90-capture-evidence.sh         # Appendix A, cluster state
 bash scripts/95-rebuild-from-scratch.sh
 ```
 
@@ -26,7 +30,8 @@ bash scripts/95-rebuild-from-scratch.sh
 
 ## Appendix A — Platform state and the main request path
 
-Source: `cluster-state-*.log`, `smoke-test-*.log`
+Source: `cluster-state-*.log`, `smoke-test-*.log`, `scaling-*.log` (node capacity),
+`rebuild-from-scratch-*.log` (object inventory)
 
 Cluster: K3s v1.36.3+k3s1 on Ubuntu 24.04.4 LTS, single node, 2 vCPU / 7.8 GB.
 Namespace `shop` with `pod-security.kubernetes.io/enforce: restricted`.
@@ -45,8 +50,8 @@ A successful checkout, showing the composed result:
 ```
 
 **Request correlation across three services.** One request ID appears in all three service logs,
-which is what makes a distributed request diagnosable. Taken verbatim from
-`smoke-test-20260814-161057.log`:
+which is what makes a distributed request diagnosable. The log lines are JSON; the fields relevant
+to correlation are extracted here from `smoke-test-20260814-161057.log`, with every value unchanged:
 
 ```
 checkout-fn   request_id=smoke-1786723857 dependency=inventory status=200 duration_ms=98.1
@@ -59,9 +64,9 @@ inventory-fn  request_id=smoke-1786723857 route=/stock/1       status=200 durati
 These are first-request timings taken immediately after a full rebuild, so they include Node.js
 process warm-up and the initial database connection: `checkout-fn` records 299.3 ms for the pricing
 call while `pricing-fn` records 0.6 ms of actual work. That gap is the cost of a cold start, not of
-the dependency, and it disappears on subsequent requests — the steady-state figures used in
-Section 3 are 6–13 ms. The discrepancy is left visible here because it is exactly what per-hop
-timings are for: without them the delay would have been misattributed to `pricing-fn`.
+the dependency, and it disappears on subsequent requests — warm end-to-end checkouts elsewhere in
+the evidence run from 10 ms to 45 ms. The discrepancy is left visible here because it is exactly
+what per-hop timings are for: without them the delay would have been misattributed to `pricing-fn`.
 
 Input validation is enforced at the edge of the service: a negative subtotal returns HTTP 400
 rather than being priced.
@@ -70,7 +75,7 @@ rather than being priced.
 
 ## Appendix B — Degradation under dependency failure
 
-Source: `degradation-*.log`
+Source: `degradation-20260814-121529.log` (B1–B5), `degradation-20260818-174328.log` (repeat run)
 
 | Stage | Condition | Result | Latency |
 |---|---|---|---|
@@ -80,12 +85,33 @@ Source: `degradation-*.log`
 | B4 | `pricing-fn` delayed 3000 ms | HTTP 503 | 1504 ms |
 | B5 | delay removed | HTTP 200 | 45 ms |
 
-Latencies in B2 and B4 are the service-side `duration_ms`; the corresponding end-to-end times
-measured at `curl` were 1504.6 ms and 1510.1 ms. Both sit on the 1500 ms timeout budget, which is
-the intended behaviour: a failing dependency costs the budget and no more.
+Latencies in B2 and B4 are the service-side `duration_ms`; B1, B3 and B5 are end-to-end times
+measured at `curl`, which for B2 and B4 were 1504.6 ms and 1510.1 ms. Both sit on the 1500 ms
+timeout budget, which is the intended behaviour: a failing dependency costs the budget and no more.
 
 The asymmetry between B2 and B4 is the dependency classification working — inventory is
 non-critical and degrades, pricing is critical and fails closed.
+
+**The degraded case is not a single number, and the repeat run is kept because it disagrees.** On
+18 August the same test degraded in 8.5 ms rather than 1502 ms:
+
+```
+{"event":"dependency_error","request_id":"deg-inventory-down","dependency":"inventory",
+ "error":"unreachable","duration_ms":3}
+HTTP 200  total=0.008458s
+```
+
+With no endpoints behind `inventory-svc` the connection was refused immediately instead of hanging
+until the budget expired. Both outcomes are correct; which one occurs depends on whether the dead
+dependency refuses or silently drops. The timeout is therefore a **bound on** the cost of
+degradation, not a measurement of it — 1502 ms is the worst case, not the typical case. The B4
+critical-path figure is unaffected, because there the dependency answers slowly rather than not at
+all, so the budget always binds.
+
+The repeat run also carries the per-pod counters that the August 14 run left empty
+(`requests_total`, `errors_total`, `dependency_failures_total`, `degraded_responses_total`); only
+the pod that served the injected failures shows `errors_total 1` and `degraded_responses_total 1`,
+which is consistent with two replicas sharing traffic.
 
 ---
 
@@ -136,25 +162,30 @@ new replicas have been updated", and 10/10 checkouts still return 200.
 
 ### C4 — Bad image tag and rollback
 
-Source: `rollout-failure-recovery-*.log`.
+Source: `rollout-failure-recovery-*.log`, quoted verbatim.
 
 ```
-checkout-fn-699f66c9db-ckmp9   0/1   ErrImagePull
-rs checkout-fn-5949488f54  DESIRED=2  CURRENT=2  READY=2
-rs checkout-fn-699f66c9db  DESIRED=1  CURRENT=1  READY=0
-rollout status exit code: 124
+    exit code from rollout status: 124  (non-zero = the platform refused to finish the release)
+    checkout-fn-5949488f54-kxs2g   1/1   Running        0     40m
+    checkout-fn-5949488f54-tqmzp   1/1   Running        0     40m
+    checkout-fn-699f66c9db-wjvk6   0/1   ErrImagePull   0     65s
+      checkout-fn-5949488f54  DESIRED=2  CURRENT=2  READY=2
+      checkout-fn-699f66c9db  DESIRED=1  CURRENT=1  READY=0
+      checkout-fn-76b747ff7d  DESIRED=0  CURRENT=0  READY=0
 ```
 
-15/15 checkouts returned 200 throughout. `kubectl rollout undo` restored the previous revision in
-under one second.
+The third ReplicaSet is an earlier revision already scaled to zero. 15/15 checkouts returned 200
+throughout. `kubectl rollout undo` restored the previous revision in under one second
+(`rollback completed in 0s`).
 
 ### C5 — Configuration error diagnosis (Lab 4.2, required exercise)
 
-Source: `misconfig-diagnosis-*.log`. The gateway upstream was changed to the Compose service name.
+Source: `misconfig-diagnosis-*.log`, quoted verbatim. The gateway upstream was changed to the
+Compose service name.
 
 ```
 nginx: [emerg] host not found in upstream "checkout-fn" in /etc/nginx/conf.d/default.conf:17
-gateway-897ddbfc7-x985t    0/1   CrashLoopBackOff
+        gateway-6dbd8ff985-2v8n5   0/1   CrashLoopBackOff   3 (30s ago)   67s
 ```
 
 Diagnosis path: gateway pods → no Service named `checkout-fn` → the real Service `checkout-svc`
@@ -212,9 +243,10 @@ than hidden.
 Source: `security-audit-*.log`, `trivy-v1-vs-v2-*.log`, `kubesec-all-workloads-*.log`
 
 **kubesec** (raw score, higher is better; every Deployment read from the live cluster by
-`83-kubesec-all-and-metrics.sh`, so these describe what is actually running):
+`83-kubesec-all-and-metrics.sh`, so these describe what is actually running). The rule list is
+printed by the script itself rather than inferred:
 
-| Deployment | Score | Rules not satisfied |
+| Deployment | Score | Rules kubesec did not mark satisfied |
 |---|---:|---|
 | `checkout-fn` | 12 | ApparmorAny, SeccompAny, RunAsGroup, RunAsUser |
 | `gateway` | 12 | ApparmorAny, SeccompAny, RunAsGroup, RunAsUser |
@@ -222,11 +254,42 @@ Source: `security-audit-*.log`, `trivy-v1-vs-v2-*.log`, `kubesec-all-workloads-*
 | `pricing-fn` | 12 | ApparmorAny, SeccompAny, RunAsGroup, RunAsUser |
 | `postgres` | 11 | the same four, plus `ReadOnlyRootFilesystem` |
 
-The one-point gap for Postgres is not an oversight in the scan: `readOnlyRootFilesystem` is set
-`false` in `20-postgres.yaml`, so kubesec lists that rule under *advise* for Postgres and under
-*passed* for the four application workloads. The earlier `80-security-audit.sh` run scored only
-two workloads because piping a multi-document manifest to `kubesec scan /dev/stdin` reads the
-first document alone; script `83` was written to close that gap.
+Two of these need interpreting rather than fixing.
+
+`ReadOnlyRootFilesystem` is the whole of the one-point gap for Postgres: it is set `false` in
+`20-postgres.yaml` and `true` in the four application workloads.
+
+`SeccompAny` is a **false negative**. Its selector is the deprecated annotation
+`container.seccomp.security.alpha.kubernetes.io/pod`, while every workload sets the current field.
+The same log prints the API's own answer:
+
+```
+    checkout-fn seccompProfile=RuntimeDefault
+    gateway seccompProfile=RuntimeDefault
+    inventory-fn seccompProfile=RuntimeDefault
+    postgres seccompProfile=RuntimeDefault
+    pricing-fn seccompProfile=RuntimeDefault
+```
+
+The earlier `80-security-audit.sh` run scored only two workloads because piping a multi-document
+manifest to `kubesec scan /dev/stdin` reads the first document alone; script `83` was written to
+close that gap.
+
+**Workload identity.** The same log lists every pod with the ServiceAccount it actually runs under,
+which is what turns "each service has its own identity" from a manifest claim into an observation:
+
+```
+  checkout-fn-5949488f54-5rj9c    checkout-sa
+  checkout-fn-5949488f54-t67dd    checkout-sa
+  gateway-79744d5f8f-8mz8j        gateway-sa
+  gateway-79744d5f8f-vssk2        gateway-sa
+  inventory-fn-548b5bfb66-5brhf   inventory-sa
+  inventory-fn-548b5bfb66-w8kr7   inventory-sa
+  postgres-8bf8f9f9b-s8glh        postgres-sa
+  pricing-fn-84ddfd689b-hwg9d     pricing-sa
+  pricing-fn-84ddfd689b-wb5vt     pricing-sa
+  pods using the default ServiceAccount: 0
+```
 
 **Trivy**, same scan against both image generations (`81-trivy-v1-vs-v2.sh`):
 
@@ -253,8 +316,9 @@ That is the evidence for the claim that the findings came from the bundled packa
 than from anything the service loads at runtime, and that removing it is a real fix rather than a
 suppression.
 
-**Workload identity:** 9/9 pods run under a dedicated ServiceAccount; none uses `default`; token
-automounting is disabled everywhere.
+**Workload identity:** 9/9 pods run under a dedicated ServiceAccount and none uses `default`, as
+listed pod by pod above from `kubesec-all-workloads-*.log`; token automounting is disabled on all
+nine, per section 3.3 of `security-audit-*.log`.
 
 **Repository credential scan:** PASS — no literal credentials in manifests or source. The
 credential is generated at deploy time by `20-create-secret.sh`; the repository holds only

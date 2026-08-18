@@ -64,10 +64,18 @@ done
 
 echo
 echo "================ Degradation counters"
-for pod in $(kubectl -n shop get pods -l app=checkout-fn -o name); do
-  echo "--- ${pod}"
-  kubectl -n shop exec "${pod}" -- wget -qO- http://localhost:3003/metrics 2>/dev/null || echo "    (metrics unavailable)"
-done
+# An earlier run left this section empty because the pod list came back blank and the loop body
+# simply never executed. Capture the list first so an empty result is reported rather than hidden.
+pods=$(kubectl -n shop get pods -l app=checkout-fn -o name 2>/dev/null)
+if [ -z "$pods" ]; then
+  echo "    (no checkout-fn pods found)"
+else
+  for pod in $pods; do
+    echo "--- ${pod}"
+    kubectl -n shop exec "${pod}" -- wget -qO- http://localhost:3003/metrics 2>/dev/null \
+      || echo "    (metrics unavailable)"
+  done
+fi
 } 2>&1 | tee "$LOG"
 
 echo "evidence: ${LOG}"
