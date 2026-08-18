@@ -47,14 +47,20 @@ bash scripts/50-test-degradation.sh
 
 Narrate each phase as it prints:
 
-> "Baseline, ten milliseconds. Now I remove inventory entirely — this is a *non-critical* dependency,
-> so checkout degrades: HTTP 200, order accepted, stock unconfirmed, at 1502 milliseconds. That's the
-> timeout budget expiring, not a coincidence.
+> "Baseline, about ten milliseconds. Now I remove inventory entirely — this is a *non-critical*
+> dependency, so checkout degrades: HTTP 200, order accepted, stock unconfirmed. Read the latency
+> off the screen rather than from me: on 14 August this took 1502 milliseconds because the call
+> hung until the budget expired, and on 18 August it took about 8 milliseconds because a Service
+> with no endpoints refused the connection outright. Both are in the evidence, and the point is
+> that 1500 milliseconds is the *ceiling* on what a dead dependency can cost, not a fixed price.
 > Restore it, back to normal.
 > Now I make pricing slow — 3000 milliseconds against a 1500 millisecond budget. Pricing is
 > *critical*: no total means no order, so it fails fast with 503 at 1504 milliseconds rather than
 > hanging the customer.
-> The cost is honest: degradation turns a 10 ms response into 1.5 seconds. A circuit breaker is the
+> The cost is honest: when the budget binds, degradation turns an 11 ms response into 1.5 seconds.
+> But it is a bound, not a fixed price — in the repeat run you can see on screen the same test
+> degrades in about 8 milliseconds, because a Service with no endpoints refuses the connection
+> instead of hanging. A circuit breaker is the
 > right next step, and I say so in the report."
 
 ## 4:10–5:10 — A real defect, found, fixed, and honestly measured

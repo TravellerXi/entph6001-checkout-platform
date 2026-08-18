@@ -65,7 +65,7 @@ These are first-request timings taken immediately after a full rebuild, so they 
 process warm-up and the initial database connection: `checkout-fn` records 299.3 ms for the pricing
 call while `pricing-fn` records 0.6 ms of actual work. That gap is the cost of a cold start, not of
 the dependency, and it disappears on subsequent requests — warm end-to-end checkouts elsewhere in
-the evidence run from 10 ms to 45 ms. The discrepancy is left visible here because it is exactly
+the evidence run from 11 ms to 46 ms. The discrepancy is left visible here because it is exactly
 what per-hop timings are for: without them the delay would have been misattributed to `pricing-fn`.
 
 Input validation is enforced at the edge of the service: a negative subtotal returns HTTP 400
@@ -79,15 +79,16 @@ Source: `degradation-20260814-121529.log` (B1–B5), `degradation-20260818-17432
 
 | Stage | Condition | Result | Latency |
 |---|---|---|---|
-| B1 | healthy | HTTP 200, `degraded:false` | 10 ms |
+| B1 | healthy | HTTP 200, `degraded:false` | 11 ms |
 | B2 | `inventory-fn` scaled to 0 | HTTP 200, `status:accepted_pending_stock_confirmation` | 1502 ms |
-| B3 | `inventory-fn` restored | HTTP 200, `degraded:false` | 13 ms |
+| B3 | `inventory-fn` restored | HTTP 200, `degraded:false` | 14 ms |
 | B4 | `pricing-fn` delayed 3000 ms | HTTP 503 | 1504 ms |
-| B5 | delay removed | HTTP 200 | 45 ms |
+| B5 | delay removed | HTTP 200 | 46 ms |
 
 Latencies in B2 and B4 are the service-side `duration_ms`; B1, B3 and B5 are end-to-end times
-measured at `curl`, which for B2 and B4 were 1504.6 ms and 1510.1 ms. Both sit on the 1500 ms
-timeout budget, which is the intended behaviour: a failing dependency costs the budget and no more.
+measured at `curl` (0.010579 s, 0.013624 s and 0.045857 s, rounded), which for B2 and B4 were
+1504.6 ms and 1510.1 ms. Both sit on the 1500 ms timeout budget, which is the intended behaviour:
+a failing dependency costs the budget and no more.
 
 The asymmetry between B2 and B4 is the dependency classification working — inventory is
 non-critical and degrades, pricing is critical and fails closed.
@@ -223,7 +224,8 @@ egress were unrestricted. DNS is the single deliberate egress exception.
 
 ## Appendix E — Rebuild from nothing
 
-Source: `rebuild-from-scratch-*.log`
+Source: `rebuild-from-scratch-*.log`. Fields are relabelled for readability; the values are the
+log's own (`real 1m0.747s`, `real 0m30.042s`, `HTTP 200`, `networkpolicies: 12`).
 
 ```
 teardown (namespace delete)          real 1m0.747s

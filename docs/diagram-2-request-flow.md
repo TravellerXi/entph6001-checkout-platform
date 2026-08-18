@@ -32,7 +32,7 @@ sequenceDiagram
         K-->>G: 200 {status: confirmed}
     else inventory unavailable (NON-critical)
         K-->>G: 200 {degraded: true, accepted_pending_stock_confirmation}
-        Note over K: E4 — graceful degradation<br/>measured 1502ms, checkout_degraded event
+        Note over K: E4 — graceful degradation<br/>bounded by the 1500ms budget, checkout_degraded event
     else pricing unavailable (CRITICAL)
         K-->>G: 503 {reason: pricing_timeout}
         Note over K: E5 — fail fast at the timeout budget<br/>measured 1504ms, checkout_failed event
