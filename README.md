@@ -3,6 +3,11 @@
 A K3s implementation of a small e-commerce checkout platform with enforced trust tiers,
 tested degradation behaviour, request correlation, and verified security posture.
 
+**Repository:** https://github.com/TravellerXi/entph6001-checkout-platform
+**Report:** [`docs/report.md`](docs/report.md) · [`docs/report.pdf`](docs/report.pdf)
+**Screencast:** `screencast.mp4`, submitted alongside the report; the narration is scripted in
+[`docs/screencast-script.md`](docs/screencast-script.md)
+
 ## What this is
 
 The organisation's existing checkout runs as a loose set of containers. This repository proposes

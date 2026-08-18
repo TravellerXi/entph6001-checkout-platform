@@ -3,6 +3,8 @@
 **Module:** ENTPH6001 Enterprise Architecture Design
 **Submission:** Cloud-native architecture for a small e-commerce checkout platform
 **Word count (Sections 1–5, excluding figures, references and appendices):** 1996
+**Repository:** https://github.com/TravellerXi/entph6001-checkout-platform
+**Screencast:** `screencast.mp4`, submitted alongside this report (see `docs/screencast-script.md`)
 
 ---
 
