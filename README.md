@@ -5,7 +5,7 @@ tested degradation behaviour, request correlation, and verified security posture
 
 **Repository:** https://github.com/TravellerXi/entph6001-checkout-platform
 **Report:** [`docs/report.md`](docs/report.md) · [`docs/report.pdf`](docs/report.pdf) (the PDF carries Appendices A–G)
-**Diagrams:** [`docs/diagrams/figure-1.svg`](docs/diagrams/figure-1.svg) · [`docs/diagrams/figure-2.svg`](docs/diagrams/figure-2.svg), exported from the Mermaid sources embedded in the report
+**Diagrams:** [`docs/diagrams/`](docs/diagrams) — each figure as SVG and PNG, exported from the Mermaid sources embedded in the report
 **Screencast:** `screencast.mp4`, submitted alongside the report; the narration is scripted in
 [`docs/screencast-script.md`](docs/screencast-script.md)
 

@@ -63,42 +63,42 @@ the application services only `inventory-fn`, which owns the datastore, probes i
 `checkout-fn` readiness excludes its dependencies, since probing them would remove every replica
 and turn partial failure into total outage.
 
-**Figure 1 — Implemented architecture with trust tiers, workload identity and enforced policy. Solid arrows are permitted paths; dotted `DENIED` / `EGRESS DENIED` edges are refused by NetworkPolicy and are the cases verified in Appendix D.**
+**Figure 1 — Implemented architecture with trust tiers, workload identity and enforced policy.** Solid arrows are permitted paths. Dotted `DENIED` and `EGRESS DENIED` edges are refused by NetworkPolicy and are the cases verified in Appendix D; `kube-dns` is the single deliberate egress exception.
 
 ```mermaid
 graph TB
   subgraph EXT["External"]
-    U["Customer browser / curl"]
-    NET["Public internet<br/>+ 169.254.169.254 metadata"]
+    U["Customer"]
+    NET["Public internet<br/>169.254.169.254"]
   end
 
-  subgraph K3S["K3s cluster - namespace: shop (Pod Security: restricted)"]
-    subgraph PUB["PUBLIC tier"]
-      ING["Traefik Ingress<br/>single controlled entry point<br/>rate-limit middleware: average 5, burst 10"]
-      GW["gateway - NGINX non-root, 2 replicas<br/>SA: gateway-sa, no token<br/>serves UI, exposes only /api/checkout<br/>mints or propagates X-Request-ID"]
+  subgraph K3S["K3s namespace: shop — Pod Security: restricted"]
+    subgraph PUB["PUBLIC"]
+      ING["Traefik Ingress<br/>rate limit"]
+      GW["gateway ×2<br/>NGINX non-root"]
     end
 
-    subgraph INT["INTERNAL tier - no external route"]
-      CO["checkout-fn (2)<br/>SA: checkout-sa, no token<br/>composition, 1500 ms timeout budget<br/>critical vs non-critical policy"]
-      PR["pricing-fn (2)<br/>SA: pricing-sa, no token<br/>tax and total"]
-      IN["inventory-fn (2)<br/>SA: inventory-sa, no token<br/>owns the stock data"]
+    subgraph INT["INTERNAL — no external route"]
+      CO["checkout-fn ×2<br/>timeout budget"]
+      PR["pricing-fn ×2"]
+      IN["inventory-fn ×2"]
     end
 
-    subgraph PROT["PROTECTED tier - data"]
-      PG[("postgres 16<br/>SA: postgres-sa, no token<br/>PVC 2Gi, RWO")]
+    subgraph PROT["PROTECTED"]
+      PG[("postgres 16<br/>PVC")]
     end
 
-    CFG["ConfigMap<br/>platform-config, gateway-config"]
-    SEC["Secret: db-credentials<br/>generated at deploy time"]
-    DNS["kube-dns<br/>the single egress exception"]
+    CFG["ConfigMap"]
+    SEC["Secret"]
+    DNS["kube-dns"]
   end
 
   U -->|HTTP| ING
-  ING -->|"ingress: kube-system only"| GW
-  GW -->|"ingress: from gateway only"| CO
-  CO -->|"from checkout only"| PR
-  CO -->|"from checkout only"| IN
-  IN -->|"from inventory only"| PG
+  ING -->|kube-system| GW
+  GW -->|from gateway| CO
+  CO -->|from checkout| PR
+  CO -->|from checkout| IN
+  IN -->|from inventory| PG
 
   CFG -.->|env| GW
   CFG -.->|env| CO
@@ -111,14 +111,11 @@ graph TB
   PR -.->|DENIED| PG
   CO -.->|DENIED| PG
 
-  GW -.->|"EGRESS DENIED"| NET
-  CO -.->|"EGRESS DENIED"| NET
-  PR -.->|"EGRESS DENIED"| NET
-  IN -.->|"EGRESS DENIED"| NET
+  GW -.->|EGRESS DENIED| NET
+  INT -.->|EGRESS DENIED| NET
 
   GW -->|allowed| DNS
-  CO -->|allowed| DNS
-  IN -->|allowed| DNS
+  INT -->|allowed| DNS
 
   classDef pub fill:#e8f0fe,stroke:#4285f4,stroke-width:2px
   classDef int fill:#e6f4ea,stroke:#34a853,stroke-width:2px
@@ -158,44 +155,44 @@ oversight: the Ingress serves HTTP (no certificate authority in scope), the data
 replica with no backup or failover, and the checkout API has no authentication. Each returns in
 Section 5.
 
-**Figure 2 — Main request flow and the evidence point behind each claim.**
+**Figure 2 — Main request flow, with the evidence point behind each claim.** Appendix B holds the measurements for E3–E5; `docs/diagram-2-request-flow.md` carries the full evidence index.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant C as Customer
-    participant T as Traefik Ingress
-    participant G as gateway (NGINX)
+    participant T as Ingress
+    participant G as gateway
     participant K as checkout-fn
     participant P as pricing-fn
     participant I as inventory-fn
     participant D as postgres
 
-    C->>T: POST /api/checkout {sku, subtotal}
-    Note over T: E1 — single public entry point<br/>cluster-state log: ingress rules
-    T->>G: route / -> gateway-svc:80
-    Note over G: E2 — correlation ID honoured or minted<br/>evidence: smoke test, request_id in 3 services
-    G->>K: POST /checkout + X-Request-ID
+    C->>T: POST /api/checkout
+    Note over T: E1 — single entry point
+    T->>G: route / -> gateway-svc
+    Note over G: E2 — X-Request-ID
+    G->>K: POST /checkout
 
-    par bounded parallel fan-out
-        K->>P: POST /price (timeout 1500ms)
+    par bounded fan-out
+        K->>P: POST /price (1500ms)
         P-->>K: {tax, total}
     and
-        K->>I: GET /stock/{sku} (timeout 1500ms)
-        I->>D: SELECT in_stock WHERE sku=$1
+        K->>I: GET /stock/{sku} (1500ms)
+        I->>D: SELECT in_stock
         D-->>I: row
         I-->>K: {inStock}
     end
-    Note over K: E3 — dependency_call events with duration_ms<br/>evidence: degradation log
+    Note over K: E3 — duration_ms per hop
 
-    alt both dependencies healthy
-        K-->>G: 200 {status: confirmed}
-    else inventory unavailable (NON-critical)
-        K-->>G: 200 {degraded: true, accepted_pending_stock_confirmation}
-        Note over K: E4 — graceful degradation<br/>bounded by the 1500ms budget, checkout_degraded event
-    else pricing unavailable (CRITICAL)
-        K-->>G: 503 {reason: pricing_timeout}
-        Note over K: E5 — fail fast at the timeout budget<br/>measured 1504ms, checkout_failed event
+    alt both healthy
+        K-->>G: 200 confirmed
+    else inventory down (NON-critical)
+        K-->>G: 200 degraded
+        Note over K: E4 — degrade, budget-bounded
+    else pricing down (CRITICAL)
+        K-->>G: 503 pricing_timeout
+        Note over K: E5 — fail fast at 1504ms
     end
 
     G-->>T: response

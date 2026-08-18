@@ -4,38 +4,38 @@
 sequenceDiagram
     autonumber
     participant C as Customer
-    participant T as Traefik Ingress
-    participant G as gateway (NGINX)
+    participant T as Ingress
+    participant G as gateway
     participant K as checkout-fn
     participant P as pricing-fn
     participant I as inventory-fn
     participant D as postgres
 
-    C->>T: POST /api/checkout {sku, subtotal}
-    Note over T: E1 — single public entry point<br/>cluster-state log: ingress rules
-    T->>G: route / -> gateway-svc:80
-    Note over G: E2 — correlation ID honoured or minted<br/>evidence: smoke test, request_id in 3 services
-    G->>K: POST /checkout + X-Request-ID
+    C->>T: POST /api/checkout
+    Note over T: E1 — single entry point
+    T->>G: route / -> gateway-svc
+    Note over G: E2 — X-Request-ID
+    G->>K: POST /checkout
 
-    par bounded parallel fan-out
-        K->>P: POST /price (timeout 1500ms)
+    par bounded fan-out
+        K->>P: POST /price (1500ms)
         P-->>K: {tax, total}
     and
-        K->>I: GET /stock/{sku} (timeout 1500ms)
-        I->>D: SELECT in_stock WHERE sku=$1
+        K->>I: GET /stock/{sku} (1500ms)
+        I->>D: SELECT in_stock
         D-->>I: row
         I-->>K: {inStock}
     end
-    Note over K: E3 — dependency_call events with duration_ms<br/>evidence: degradation log
+    Note over K: E3 — duration_ms per hop
 
-    alt both dependencies healthy
-        K-->>G: 200 {status: confirmed}
-    else inventory unavailable (NON-critical)
-        K-->>G: 200 {degraded: true, accepted_pending_stock_confirmation}
-        Note over K: E4 — graceful degradation<br/>bounded by the 1500ms budget, checkout_degraded event
-    else pricing unavailable (CRITICAL)
-        K-->>G: 503 {reason: pricing_timeout}
-        Note over K: E5 — fail fast at the timeout budget<br/>measured 1504ms, checkout_failed event
+    alt both healthy
+        K-->>G: 200 confirmed
+    else inventory down (NON-critical)
+        K-->>G: 200 degraded
+        Note over K: E4 — degrade, budget-bounded
+    else pricing down (CRITICAL)
+        K-->>G: 503 pricing_timeout
+        Note over K: E5 — fail fast at 1504ms
     end
 
     G-->>T: response
