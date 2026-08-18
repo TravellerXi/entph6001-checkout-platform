@@ -1,0 +1,21 @@
+--- 1. Starting state
+    checkout-fn READY=2/2  AVAILABLE=2
+    node allocatable: 2 CPU, 8127868Ki memory
+
+--- 2. Scale out 2 -> 10, sampling availability throughout (paced under the rate limit)
+    responses during scale-out: 200 200 200 200 200 200 200 200 200 200 200 200 200 200 
+    reached 10 replicas in 10s
+    READY=10/10  UP-TO-DATE=10  AVAILABLE=10
+    Pending pods: 0
+
+--- 3. What the scheduler had to reserve
+      Resource           Requests      Limits
+      cpu                1100m (55%)   5100m (254%)
+      memory             1228Mi (15%)  3626Mi (45%)
+    NOTE: replicas are bounded by one node's allocatable capacity. Horizontal scaling here
+    buys concurrency and rollout safety, not fault tolerance: all 10 replicas share the
+    single node, so this does not address the single point of failure.
+
+--- 4. Scale back 10 -> 2
+    READY=2/2  AVAILABLE=2
+    checkout -> HTTP 200

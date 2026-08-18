@@ -1,0 +1,20 @@
+=== 1. Ingress -> gateway -> checkout -> pricing + inventory -> postgres
+HTTP 200  total=0.312865s
+--- response body ---
+{"status":"confirmed","degraded":false,"pricing":{"subtotal":100,"taxRate":0.23,"tax":23,"total":123},"stock":{"sku":1,"inStock":true,"confirmed":true},"requestId":"smoke-1786723857"}
+
+=== 2. Out-of-stock SKU (sku=3 seeded as false)
+{"status":"out_of_stock","degraded":false,"pricing":{"subtotal":50,"taxRate":0.23,"tax":11.5,"total":61.5},"stock":{"sku":3,"inStock":false,"confirmed":true},"requestId":"8d1bd123605ec27c8f2f1943db63628c"}
+
+=== 3. Input validation (negative subtotal must be rejected)
+HTTP 400
+
+=== 4. Request-ID propagation across all three services
+--- checkout-fn
+{"ts":"2026-08-14T16:10:58.189Z","level":"info","service":"checkout-fn","event":"dependency_call","request_id":"smoke-1786723857","dependency":"inventory","status":200,"duration_ms":98.1}
+{"ts":"2026-08-14T16:10:58.193Z","level":"info","service":"checkout-fn","event":"dependency_call","request_id":"smoke-1786723857","dependency":"pricing","status":200,"duration_ms":299.3}
+{"ts":"2026-08-14T16:10:58.195Z","level":"info","service":"checkout-fn","event":"http_request","request_id":"smoke-1786723857","method":"POST","route":"/checkout","status":200,"duration_ms":301.8}
+--- pricing-fn
+{"ts":"2026-08-14T16:10:58.112Z","level":"info","service":"pricing-fn","event":"http_request","request_id":"smoke-1786723857","method":"POST","route":"/price","status":200,"duration_ms":0.6}
+--- inventory-fn
+{"ts":"2026-08-14T16:10:58.110Z","level":"info","service":"inventory-fn","event":"http_request","request_id":"smoke-1786723857","method":"GET","route":"/stock/1","status":200,"duration_ms":3.3}

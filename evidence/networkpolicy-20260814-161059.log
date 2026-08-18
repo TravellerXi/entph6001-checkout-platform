@@ -1,0 +1,44 @@
+== pods under test
+   gateway=gateway-79744d5f8f-8j7ht checkout=checkout-fn-5949488f54-4v6mk pricing=pricing-fn-84ddfd689b-8rprc inventory=inventory-fn-548b5bfb66-7n9hc
+
+== A. Allowed paths (the architecture must still work)
+A1 gateway   -> checkout-svc  (documented)     expected=ALLOWED  actual=ALLOWED  PASS
+A2 checkout  -> pricing-svc   (documented)     expected=ALLOWED  actual=ALLOWED  PASS
+A3 checkout  -> inventory-svc (documented)     expected=ALLOWED  actual=ALLOWED  PASS
+A4 inventory -> postgres:5432 (documented)     expected=ALLOWED  actual=ALLOWED  PASS
+
+== B. Denied paths (lateral movement must fail)
+B1 gateway   -> pricing-svc   (bypass tier)    expected=BLOCKED  actual=BLOCKED  PASS
+B2 gateway   -> inventory-svc (bypass tier)    expected=BLOCKED  actual=BLOCKED  PASS
+B3 gateway   -> postgres:5432 (public->protected) expected=BLOCKED  actual=BLOCKED  PASS
+B4 pricing   -> postgres:5432 (not data owner) expected=BLOCKED  actual=BLOCKED  PASS
+B5 checkout  -> postgres:5432 (not data owner) expected=BLOCKED  actual=BLOCKED  PASS
+B6 pricing   -> inventory-svc (peer isolation) expected=BLOCKED  actual=BLOCKED  PASS
+
+== D. Egress control (a compromised workload must not phone home)
+D1 checkout  -> internet          (egress deny) expected=BLOCKED  actual=BLOCKED  PASS
+D2 pricing   -> internet          (egress deny) expected=BLOCKED  actual=BLOCKED  PASS
+D3 inventory -> internet          (egress deny) expected=BLOCKED  actual=BLOCKED  PASS
+D4 gateway   -> internet          (egress deny) expected=BLOCKED  actual=BLOCKED  PASS
+D5 inventory -> cloud metadata     (SSRF path) expected=BLOCKED  actual=BLOCKED  PASS
+
+== C. Compromised-workload simulation (unlabelled pod, default-deny must hold)
+C1 attacker -> checkout-svc                    expected=BLOCKED  actual=BLOCKED  PASS
+C2 attacker -> pricing-svc                     expected=BLOCKED  actual=BLOCKED  PASS
+C3 attacker -> inventory-svc                   expected=BLOCKED  actual=BLOCKED  PASS
+C4 attacker -> postgres:5432                   expected=BLOCKED  actual=BLOCKED  PASS
+
+== policies in force
+NAME                                   POD-SELECTOR       AGE
+allow-dns-egress                       <none>             87s
+checkout-egress-to-dependencies-only   app=checkout-fn    87s
+checkout-from-gateway-only             app=checkout-fn    87s
+default-deny-all                       <none>             87s
+gateway-egress-to-checkout-only        app=gateway        87s
+gateway-from-ingress-only              app=gateway        87s
+inventory-egress-to-postgres-only      app=inventory-fn   87s
+inventory-from-checkout-only           app=inventory-fn   87s
+postgres-egress-none                   app=postgres       87s
+postgres-from-inventory-only           app=postgres       87s
+pricing-egress-none                    app=pricing-fn     87s
+pricing-from-checkout-only             app=pricing-fn     87s

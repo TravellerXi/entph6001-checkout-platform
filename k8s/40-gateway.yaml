@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: shop
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: gateway, tier: public }
+  template:
+    metadata:
+      labels: { app: gateway, tier: public }
+    spec:
+      serviceAccountName: gateway-sa
+      automountServiceAccountToken: false
+      # Give the endpoints controller time to remove this pod before NGINX stops accepting.
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: gateway
+          # Unprivileged NGINX listens on 8080 and runs as non-root, satisfying the restricted
+          # Pod Security Standard that stock nginx:alpine cannot meet.
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8080 }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 32Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+          lifecycle:
+            preStop:
+              exec: { command: ["/bin/sh", "-c", "sleep 5"] }
+          volumeMounts:
+            - { name: conf, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf }
+            - { name: html, mountPath: /usr/share/nginx/html/index.html, subPath: index.html }
+            # A read-only root filesystem forces every writable path to be declared. NGINX needs
+            # these three for its worker temp files and pid, so they are explicit emptyDir mounts
+            # rather than an implicitly writable container filesystem.
+            - { name: cache, mountPath: /var/cache/nginx }
+            - { name: run,   mountPath: /var/run }
+            - { name: tmp,   mountPath: /tmp }
+      volumes:
+        - { name: cache, emptyDir: {} }
+        - { name: run,   emptyDir: {} }
+        - { name: tmp,   emptyDir: {} }
+        - name: conf
+          configMap:
+            name: gateway-config
+            items: [{ key: default.conf, path: default.conf }]
+        - name: html
+          configMap:
+            name: gateway-config
+            items: [{ key: index.html, path: index.html }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-svc
+  namespace: shop
+spec:
+  selector: { app: gateway }
+  ports: [{ name: http, port: 80, targetPort: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shop-ingress
+  namespace: shop
+  annotations:
+    # Admission control at the edge, before traffic reaches any application workload.
+    traefik.ingress.kubernetes.io/router.middlewares: shop-checkout-ratelimit@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-svc
+                port:
+                  number: 80

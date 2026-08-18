@@ -1,0 +1,100 @@
+==== BEFORE: existing state
+pods: 9
+namespace: Active
+
+==== DESTROY: delete the entire namespace (workloads, config, secret, PVC)
+namespace "shop" deleted
+
+real	1m0.747s
+user	0m0.108s
+sys	0m0.030s
+namespace gone: 1
+
+==== REBUILD: single command, from manifests only
+==> 1/5 build and import images (tag=v2)
+==> building
+    ead/pricing-fn:v2
+    ead/inventory-fn:v2
+    ead/checkout-fn:v2
+==> exporting to tar
+==> importing into containerd
+docker.io/ead/checkout-fn:v1
+docker.io/ead/checkout-fn:v2
+docker.io/ead/inventory-fn:v1
+docker.io/ead/inventory-fn:v2
+docker.io/ead/pricing-fn:v1
+docker.io/ead/pricing-fn:v2
+==> done
+==> 2/5 namespace and configuration
+namespace/shop created
+serviceaccount/gateway-sa created
+serviceaccount/checkout-sa created
+serviceaccount/pricing-sa created
+serviceaccount/inventory-sa created
+serviceaccount/postgres-sa created
+configmap/platform-config created
+configmap/gateway-config created
+==> 3/5 database credentials (generated locally, never committed)
+secret/db-credentials created
+db-credentials created/updated in namespace shop (value not displayed)
+==> 4/5 workloads
+persistentvolumeclaim/postgres-pvc created
+deployment.apps/postgres created
+service/postgres-svc created
+deployment.apps/pricing-fn created
+service/pricing-svc created
+deployment.apps/inventory-fn created
+service/inventory-svc created
+deployment.apps/checkout-fn created
+service/checkout-svc created
+middleware.traefik.io/checkout-ratelimit created
+deployment.apps/gateway created
+service/gateway-svc created
+ingress.networking.k8s.io/shop-ingress created
+==> 5/5 trust boundaries
+networkpolicy.networking.k8s.io/default-deny-all created
+networkpolicy.networking.k8s.io/allow-dns-egress created
+networkpolicy.networking.k8s.io/gateway-from-ingress-only created
+networkpolicy.networking.k8s.io/gateway-egress-to-checkout-only created
+networkpolicy.networking.k8s.io/checkout-from-gateway-only created
+networkpolicy.networking.k8s.io/checkout-egress-to-dependencies-only created
+networkpolicy.networking.k8s.io/pricing-from-checkout-only created
+networkpolicy.networking.k8s.io/pricing-egress-none created
+networkpolicy.networking.k8s.io/inventory-from-checkout-only created
+networkpolicy.networking.k8s.io/inventory-egress-to-postgres-only created
+networkpolicy.networking.k8s.io/postgres-from-inventory-only created
+networkpolicy.networking.k8s.io/postgres-egress-none created
+==> waiting for readiness
+deployment.apps/checkout-fn condition met
+deployment.apps/gateway condition met
+deployment.apps/inventory-fn condition met
+deployment.apps/postgres condition met
+deployment.apps/pricing-fn condition met
+
+NAME                            READY   STATUS    RESTARTS   AGE   TIER
+checkout-fn-5949488f54-5rj9c    1/1     Running   0          18s   internal
+checkout-fn-5949488f54-t67dd    1/1     Running   0          18s   internal
+gateway-79744d5f8f-8mz8j        1/1     Running   0          18s   public
+gateway-79744d5f8f-vssk2        1/1     Running   0          17s   public
+inventory-fn-548b5bfb66-5brhf   1/1     Running   0          18s   internal
+inventory-fn-548b5bfb66-w8kr7   1/1     Running   0          18s   internal
+postgres-8bf8f9f9b-s8glh        1/1     Running   0          19s   protected
+pricing-fn-84ddfd689b-hwg9d     1/1     Running   0          18s   internal
+pricing-fn-84ddfd689b-wb5vt     1/1     Running   0          18s   internal
+
+Deployed. Verify with: bash /home/student/ead/scripts/30-smoke-test.sh
+
+real	0m30.042s
+user	0m2.597s
+sys	0m0.752s
+
+==== VERIFY: main request path works on the rebuilt platform
+{"status":"confirmed","degraded":false,"pricing":{"subtotal":100,"taxRate":0.23,"tax":23,"total":123},"stock":{"sku":1,"inStock":true,"confirmed":true},"requestId":"rebuild-verify"}
+HTTP 200
+
+==== VERIFY: trust boundaries re-established
+networkpolicies: 12
+
+==== NOTE: the PVC was deleted with the namespace, so seeded stock data is
+     recreated by inventory-fn on startup. This is intentional for a lab rebuild;
+     a production design would keep the volume outside the application namespace lifecycle.

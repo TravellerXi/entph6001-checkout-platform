@@ -1,0 +1,15 @@
+======== GROUP A (control): preStop removed, grace period 1s
+config:  grace=1
+--- control status distribution
+    173 200
+      4 000
+      2 502
+--- control: total=179 failures=6
+
+======== GROUP B (fix): preStop sleep 5, grace period 30s
+config: {"preStop":{"exec":{"command":["/bin/sh","-c","sleep 5"]}}} grace=30
+--- fix status distribution
+    205 200
+      2 000
+      1 502
+--- fix: total=208 failures=3

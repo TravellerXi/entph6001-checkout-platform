@@ -1,0 +1,113 @@
+############ Cluster and platform
+NAME         STATUS   ROLES           AGE     VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION              CONTAINER-RUNTIME
+ead-server   Ready    control-plane   4h18m   v1.36.3+k3s1   10.0.0.4      <none>        Ubuntu 24.04.4 LTS   6.17.0-1022-azure (amd64)   containerd://2.3.2-k3s2
+
+  gitVersion: v1.36.3+k3s1
+  platform: linux/amd64
+  gitVersion: v1.36.3+k3s1
+  platform: linux/amd64
+
+############ Workloads
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE     CONTAINERS     IMAGES                                    SELECTOR
+deployment.apps/checkout-fn    2/2     2            2           4m13s   checkout-fn    ead/checkout-fn:v2                        app=checkout-fn,tier=internal
+deployment.apps/gateway        2/2     2            2           4m12s   gateway        nginxinc/nginx-unprivileged:1.27-alpine   app=gateway,tier=public
+deployment.apps/inventory-fn   2/2     2            2           4m13s   inventory-fn   ead/inventory-fn:v2                       app=inventory-fn,tier=internal
+deployment.apps/postgres       1/1     1            1           4m14s   postgres       postgres:16-alpine                        app=postgres,tier=protected
+deployment.apps/pricing-fn     2/2     2            2           4m13s   pricing-fn     ead/pricing-fn:v2                         app=pricing-fn,tier=internal
+
+NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE     SELECTOR
+service/checkout-svc    ClusterIP   10.43.117.100   <none>        80/TCP     4m13s   app=checkout-fn
+service/gateway-svc     ClusterIP   10.43.134.126   <none>        80/TCP     4m12s   app=gateway
+service/inventory-svc   ClusterIP   10.43.33.89     <none>        80/TCP     4m13s   app=inventory-fn
+service/postgres-svc    ClusterIP   10.43.104.64    <none>        5432/TCP   4m14s   app=postgres
+service/pricing-svc     ClusterIP   10.43.159.30    <none>        80/TCP     4m13s   app=pricing-fn
+
+NAME                                     CLASS     HOSTS   ADDRESS    PORTS   AGE
+ingress.networking.k8s.io/shop-ingress   traefik   *       10.0.0.4   80      4m12s
+
+NAME                                 STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE     VOLUMEMODE
+persistentvolumeclaim/postgres-pvc   Bound    pvc-0bf4948d-84de-4d26-81c3-ab9ae142805a   2Gi        RWO            local-path     <unset>                 4m14s   Filesystem
+
+############ Pods with images and trust tier
+NAME                            READY   STATUS    RESTARTS        AGE     IP            NODE         NOMINATED NODE   READINESS GATES   TIER
+checkout-fn-5949488f54-4v6mk    1/1     Running   0               4m13s   10.42.0.121   ead-server   <none>           <none>            internal
+checkout-fn-5949488f54-7x89d    1/1     Running   0               4m13s   10.42.0.122   ead-server   <none>           <none>            internal
+gateway-79744d5f8f-8j7ht        1/1     Running   0               4m12s   10.42.0.123   ead-server   <none>           <none>            public
+gateway-79744d5f8f-bdlgr        1/1     Running   0               4m12s   10.42.0.124   ead-server   <none>           <none>            public
+inventory-fn-548b5bfb66-7n9hc   1/1     Running   1 (2m42s ago)   4m13s   10.42.0.120   ead-server   <none>           <none>            internal
+inventory-fn-548b5bfb66-dpbzz   1/1     Running   1 (2m42s ago)   4m13s   10.42.0.119   ead-server   <none>           <none>            internal
+postgres-8bf8f9f9b-4tpg5        1/1     Running   0               2m42s   10.42.0.127   ead-server   <none>           <none>            protected
+pricing-fn-84ddfd689b-8rprc     1/1     Running   0               4m13s   10.42.0.117   ead-server   <none>           <none>            internal
+pricing-fn-84ddfd689b-gt4rj     1/1     Running   0               4m13s   10.42.0.116   ead-server   <none>           <none>            internal
+
+############ Images actually running
+checkout-fn-5949488f54-4v6mk    ead/checkout-fn:v2
+checkout-fn-5949488f54-7x89d    ead/checkout-fn:v2
+gateway-79744d5f8f-8j7ht        nginxinc/nginx-unprivileged:1.27-alpine
+gateway-79744d5f8f-bdlgr        nginxinc/nginx-unprivileged:1.27-alpine
+inventory-fn-548b5bfb66-7n9hc   ead/inventory-fn:v2
+inventory-fn-548b5bfb66-dpbzz   ead/inventory-fn:v2
+postgres-8bf8f9f9b-4tpg5        postgres:16-alpine
+pricing-fn-84ddfd689b-8rprc     ead/pricing-fn:v2
+pricing-fn-84ddfd689b-gt4rj     ead/pricing-fn:v2
+
+############ Ingress routing
+Name:             shop-ingress
+Labels:           <none>
+Namespace:        shop
+Address:          10.0.0.4
+Ingress Class:    traefik
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           
+              /   gateway-svc:80 (10.42.0.123:8080,10.42.0.124:8080)
+Annotations:  traefik.ingress.kubernetes.io/router.middlewares: shop-checkout-ratelimit@kubernetescrd
+Events:       <none>
+
+############ NetworkPolicies
+NAME                                   POD-SELECTOR       AGE
+allow-dns-egress                       <none>             4m11s
+checkout-egress-to-dependencies-only   app=checkout-fn    4m11s
+checkout-from-gateway-only             app=checkout-fn    4m11s
+default-deny-all                       <none>             4m11s
+gateway-egress-to-checkout-only        app=gateway        4m11s
+gateway-from-ingress-only              app=gateway        4m11s
+inventory-egress-to-postgres-only      app=inventory-fn   4m11s
+inventory-from-checkout-only           app=inventory-fn   4m11s
+postgres-egress-none                   app=postgres       4m11s
+postgres-from-inventory-only           app=postgres       4m11s
+pricing-egress-none                    app=pricing-fn     4m11s
+pricing-from-checkout-only             app=pricing-fn     4m11s
+
+############ Configuration surface (non-secret)
+{"INVENTORY_URL":"http://inventory-svc","PGDATABASE":"shop","PGHOST":"postgres-svc","PGPORT":"5432","PGUSER":"shop","PRICING_URL":"http://pricing-svc","TAX_RATE":"0.23","TIMEOUT_MS":"1500"}
+
+############ Secret metadata only (values never printed)
+db-credentials  type=Opaque  keys="PGPASSWORD" "POSTGRES_PASSWORD" 
+
+############ Probe configuration (liveness shallow vs readiness deep)
+checkout-fn    /health    /live
+gateway        /healthz   /healthz
+inventory-fn   /health    /live
+postgres       <none>     <none>
+pricing-fn     /health    /live
+
+############ Recent structured logs (one sample per service)
+--- gateway
+10.42.0.1 - - [14/Aug/2026:16:14:22 +0000] "GET /healthz HTTP/1.1" 200 11 "-" "kube-probe/1.36" "-"
+10.42.0.1 - - [14/Aug/2026:16:14:25 +0000] "GET /healthz HTTP/1.1" 200 11 "-" "kube-probe/1.36" "-"
+10.42.0.1 - - [14/Aug/2026:16:14:30 +0000] "GET /healthz HTTP/1.1" 200 11 "-" "kube-probe/1.36" "-"
+--- checkout-fn
+{"ts":"2026-08-14T16:14:20.765Z","level":"info","service":"checkout-fn","event":"http_request","request_id":"5da818de-904f-4f12-85c6-759e1a189003","method":"GET","route":"/live","status":200,"duration_ms":0.4}
+{"ts":"2026-08-14T16:14:24.502Z","level":"info","service":"checkout-fn","event":"http_request","request_id":"d51e98f3-f3be-4658-8512-8d7bdc9dad9e","method":"GET","route":"/health","status":200,"duration_ms":0.7}
+{"ts":"2026-08-14T16:14:29.501Z","level":"info","service":"checkout-fn","event":"http_request","request_id":"eba8c366-cf77-497d-a0fb-2cd180a8d5cb","method":"GET","route":"/health","status":200,"duration_ms":0.5}
+--- pricing-fn
+{"ts":"2026-08-14T16:14:23.499Z","level":"info","service":"pricing-fn","event":"http_request","request_id":"4bc1b54d-e96a-4191-920c-1dab709283d0","method":"GET","route":"/health","status":200,"duration_ms":0.4}
+{"ts":"2026-08-14T16:14:28.499Z","level":"info","service":"pricing-fn","event":"http_request","request_id":"3484efef-d06d-4dc9-b9fe-bec2efeadbca","method":"GET","route":"/health","status":200,"duration_ms":0.4}
+{"ts":"2026-08-14T16:14:33.500Z","level":"info","service":"pricing-fn","event":"http_request","request_id":"78a90673-b28b-483c-839c-47a10888b604","method":"GET","route":"/health","status":200,"duration_ms":0.6}
+--- inventory-fn
+{"ts":"2026-08-14T16:14:22.727Z","level":"info","service":"inventory-fn","event":"http_request","request_id":"d90f54d7-0d01-46e4-a525-ed2f863a3660","method":"GET","route":"/health","status":200,"duration_ms":1.3}
+{"ts":"2026-08-14T16:14:27.727Z","level":"info","service":"inventory-fn","event":"http_request","request_id":"3e52225c-fe6b-4d85-bfcc-53909868d586","method":"GET","route":"/health","status":200,"duration_ms":1.1}
+{"ts":"2026-08-14T16:14:32.728Z","level":"info","service":"inventory-fn","event":"http_request","request_id":"4aa46ac3-0356-404d-bb0d-8de134ef6d34","method":"GET","route":"/health","status":200,"duration_ms":1.7}

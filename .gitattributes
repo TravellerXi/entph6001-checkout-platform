@@ -1,0 +1,14 @@
+# Shell scripts and Kubernetes manifests are consumed by Linux, so they must stay LF
+# regardless of the cloning machine's core.autocrlf setting. Without this, a Windows clone
+# rewrites every .sh to CRLF and bash fails with "\r: command not found".
+* text=auto eol=lf
+
+*.sh    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+Dockerfile text eol=lf
+
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.mp4   binary

@@ -1,0 +1,47 @@
+--- STEP 0. Working baseline
+    checkout -> HTTP 200
+    current upstream in ConfigMap:
+              proxy_pass http://checkout-svc/checkout;
+
+--- STEP 1. Inject the migration bug: use the Compose name instead of the Service name
+    injection verified in the cluster:
+              proxy_pass http://checkout-fn/checkout;
+    rollout status after restart (bounded):
+      Waiting for deployment "gateway" rollout to finish: 1 out of 2 new replicas have been updated...
+
+--- STEP 2. Symptom as a user sees it
+    checkout x5 -> 200 200 200 200 200 
+    NOTE: the lab predicts 503 here. This platform returns 200 because the broken config
+    cannot pass the readiness gate, so the old gateway pods keep serving. The failure is
+    therefore visible to operators (CrashLoopBackOff) but not to users. That is the
+    intended behaviour of running two replicas behind a rolling update.
+
+--- STEP 3. Diagnose (lab 4.3 workflow: pods -> service -> endpoints -> logs)
+    3a. are the gateway pods running?
+        gateway-6dbd8ff985-2v8n5   0/1   CrashLoopBackOff   3 (30s ago)   67s
+        gateway-84c49f68df-brvd5   1/1   Running            0             103s
+        gateway-84c49f68df-skkrv   1/1   Running            0             109s
+    3b. does a Service named 'checkout-fn' exist?
+        NO SUCH SERVICE -> DNS for checkout-fn cannot resolve
+    3c. what Services actually exist?
+        checkout-svc  10.43.179.188  80/TCP
+        gateway-svc  10.43.214.131  80/TCP
+        inventory-svc  10.43.30.95  80/TCP
+        postgres-svc  10.43.69.254  5432/TCP
+        pricing-svc  10.43.69.60  80/TCP
+    3d. endpoints behind the real Service (backend itself is healthy):
+        checkout-svc-zc9js   IPv4   3003   10.42.0.69,10.42.0.73   168m
+    3e. the gateway's own words:
+        2026/08/14 15:32:48 [emerg] 1#1: host not found in upstream "checkout-fn" in /etc/nginx/conf.d/default.conf:17
+        nginx: [emerg] host not found in upstream "checkout-fn" in /etc/nginx/conf.d/default.conf:17
+        (previous) 2026/08/14 15:32:48 [emerg] 1#1: host not found in upstream "checkout-fn" in /etc/nginx/conf.d/default.conf:17
+        (previous) nginx: [emerg] host not found in upstream "checkout-fn" in /etc/nginx/conf.d/default.conf:17
+
+    ROOT CAUSE: the gateway resolves the container name from Compose, but in Kubernetes
+    the stable name is the Service. The backend was never unhealthy.
+
+--- STEP 4. Fix and prove
+    deployment "gateway" successfully rolled out
+    restored upstream:
+              proxy_pass http://checkout-svc/checkout;
+    checkout x5 -> 200 200 200 200 200 

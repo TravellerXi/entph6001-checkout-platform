@@ -1,0 +1,233 @@
+############ PART 1: Kubernetes configuration scan (kubesec)
+=== 20-postgres.yaml
+    "object": "PersistentVolumeClaim/postgres-pvc.shop",
+    "score": 0,
+(kubesec unavailable)
+=== 30-services.yaml
+    "object": "Deployment/pricing-fn.shop",
+    "score": 12,
+          "id": "ServiceAccountName",
+          "selector": ".spec .serviceAccountName",
+          "id": "AutomountServiceAccountToken",
+          "selector": ".spec .automountServiceAccountToken == false",
+          "id": "RunAsNonRoot",
+          "selector": ".spec, .spec.containers[] | .securityContext .runAsNonRoot == true",
+          "id": "LimitsCPU",
+          "selector": "containers[] .resources .limits .cpu",
+          "id": "LimitsMemory",
+          "selector": "containers[] .resources .limits .memory",
+          "id": "RequestsCPU",
+          "selector": "containers[] .resources .requests .cpu",
+          "id": "RequestsMemory",
+          "selector": "containers[] .resources .requests .memory",
+          "id": "CapDropAny",
+          "selector": "containers[] .securityContext .capabilities .drop",
+          "id": "CapDropAll",
+          "selector": "containers[] .securityContext .capabilities .drop | index(\"ALL\")",
+          "id": "ReadOnlyRootFilesystem",
+          "selector": "containers[] .securityContext .readOnlyRootFilesystem == true",
+          "id": "ApparmorAny",
+          "selector": ".metadata .annotations .\"container.apparmor.security.beta.kubernetes.io/nginx\"",
+          "id": "SeccompAny",
+          "selector": ".metadata .annotations .\"container.seccomp.security.alpha.kubernetes.io/pod\"",
+          "id": "RunAsGroup",
+          "selector": ".spec, .spec.containers[] | .securityContext .runAsGroup -gt 10000",
+          "id": "RunAsUser",
+          "selector": ".spec, .spec.containers[] | .securityContext .runAsUser -gt 10000",
+=== 40-gateway.yaml
+    "object": "Deployment/gateway.shop",
+    "score": 12,
+          "id": "ServiceAccountName",
+          "selector": ".spec .serviceAccountName",
+          "id": "AutomountServiceAccountToken",
+          "selector": ".spec .automountServiceAccountToken == false",
+          "id": "RunAsNonRoot",
+          "selector": ".spec, .spec.containers[] | .securityContext .runAsNonRoot == true",
+          "id": "LimitsCPU",
+          "selector": "containers[] .resources .limits .cpu",
+          "id": "LimitsMemory",
+          "selector": "containers[] .resources .limits .memory",
+          "id": "RequestsCPU",
+          "selector": "containers[] .resources .requests .cpu",
+          "id": "RequestsMemory",
+          "selector": "containers[] .resources .requests .memory",
+          "id": "CapDropAny",
+          "selector": "containers[] .securityContext .capabilities .drop",
+          "id": "CapDropAll",
+          "selector": "containers[] .securityContext .capabilities .drop | index(\"ALL\")",
+          "id": "ReadOnlyRootFilesystem",
+          "selector": "containers[] .securityContext .readOnlyRootFilesystem == true",
+          "id": "ApparmorAny",
+          "selector": ".metadata .annotations .\"container.apparmor.security.beta.kubernetes.io/nginx\"",
+          "id": "SeccompAny",
+          "selector": ".metadata .annotations .\"container.seccomp.security.alpha.kubernetes.io/pod\"",
+          "id": "RunAsGroup",
+          "selector": ".spec, .spec.containers[] | .securityContext .runAsGroup -gt 10000",
+          "id": "RunAsUser",
+          "selector": ".spec, .spec.containers[] | .securityContext .runAsUser -gt 10000",
+
+############ PART 2: Image vulnerability scan (Trivy)
+scanning tag: v2 (override with TAG=...)
+=== ead/pricing-fn:v2
+│ app/node_modules/type-is/node_modules/content-type/package.json     │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/type-is/package.json                               │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/unpipe/package.json                                │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/vary/package.json                                  │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/wrappy/package.json                                │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/package.json                                                    │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ opt/yarn-v1.22.22/package.json                                      │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ usr/local/lib/node_modules/corepack/package.json                    │ node-pkg │        0        │
+└─────────────────────────────────────────────────────────────────────┴──────────┴─────────────────┘
+Legend:
+- '-': Not scanned
+- '0': Clean (no security findings detected)
+
+=== ead/inventory-fn:v2
+│ app/node_modules/type-is/package.json                               │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/unpipe/package.json                                │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/vary/package.json                                  │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/wrappy/package.json                                │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/xtend/package.json                                 │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/package.json                                                    │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ opt/yarn-v1.22.22/package.json                                      │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ usr/local/lib/node_modules/corepack/package.json                    │ node-pkg │        0        │
+└─────────────────────────────────────────────────────────────────────┴──────────┴─────────────────┘
+Legend:
+- '-': Not scanned
+- '0': Clean (no security findings detected)
+
+=== ead/checkout-fn:v2
+│ app/node_modules/type-is/node_modules/content-type/package.json     │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/type-is/package.json                               │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/unpipe/package.json                                │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/vary/package.json                                  │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/node_modules/wrappy/package.json                                │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ app/package.json                                                    │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ opt/yarn-v1.22.22/package.json                                      │ node-pkg │        0        │
+├─────────────────────────────────────────────────────────────────────┼──────────┼─────────────────┤
+│ usr/local/lib/node_modules/corepack/package.json                    │ node-pkg │        0        │
+└─────────────────────────────────────────────────────────────────────┴──────────┴─────────────────┘
+Legend:
+- '-': Not scanned
+- '0': Clean (no security findings detected)
+
+=== postgres:16-alpine
+│         │                │          │        │                   │                              │ directory traversal                                          │
+│         │                │          │        │                   │                              │ https://avd.aquasec.com/nvd/cve-2026-39822                   │
+│         ├────────────────┤          │        │                   ├──────────────────────────────┼──────────────────────────────────────────────────────────────┤
+│         │ CVE-2026-39836 │          │        │                   │ 1.25.10, 1.26.3              │ net: golang: Go net package: Denial of Service via NUL byte  │
+│         │                │          │        │                   │                              │ in...                                                        │
+│         │                │          │        │                   │                              │ https://avd.aquasec.com/nvd/cve-2026-39836                   │
+│         ├────────────────┤          │        │                   │                              ├──────────────────────────────────────────────────────────────┤
+│         │ CVE-2026-42499 │          │        │                   │                              │ net/mail: golang: net/mail: Denial of Service via            │
+│         │                │          │        │                   │                              │ pathological email address parsing                           │
+│         │                │          │        │                   │                              │ https://avd.aquasec.com/nvd/cve-2026-42499                   │
+│         ├────────────────┤          │        │                   ├──────────────────────────────┼──────────────────────────────────────────────────────────────┤
+│         │ CVE-2026-42504 │          │        │                   │ 1.25.11, 1.26.4              │ mime: golang: Golang MIME: Denial of Service via             │
+│         │                │          │        │                   │                              │ maliciously-crafted MIME header                              │
+│         │                │          │        │                   │                              │ https://avd.aquasec.com/nvd/cve-2026-42504                   │
+│         ├────────────────┤          │        │                   ├──────────────────────────────┼──────────────────────────────────────────────────────────────┤
+│         │ CVE-2026-46600 │          │        │                   │ 1.26.6, 1.27.0-rc.3          │ golang.org/x/net/dns/dnsmessage:                             │
+│         │                │          │        │                   │                              │ golang.org/x/net/dns/dnsmessage: Denial of Service via       │
+│         │                │          │        │                   │                              │ invalid DNS record parsing                                   │
+│         │                │          │        │                   │                              │ https://avd.aquasec.com/nvd/cve-2026-46600                   │
+└─────────┴────────────────┴──────────┴────────┴───────────────────┴──────────────────────────────┴──────────────────────────────────────────────────────────────┘
+=== nginxinc/nginx-unprivileged:1.27-alpine
+│              │ CVE-2026-6732  │          │        │                   │ 2.13.9-r1     │ libxml2: libxml2: Denial of Service via crafted              │
+│              │                │          │        │                   │               │ XSD-validated document                                       │
+│              │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2026-6732                    │
+├──────────────┼────────────────┤          │        ├───────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
+│ musl         │ CVE-2026-40200 │          │        │ 1.2.5-r9          │ 1.2.5-r11     │ musl: musl libc: Arbitrary code execution and denial of      │
+│              │                │          │        │                   │               │ service via stack-based...                                   │
+│              │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2026-40200                   │
+├──────────────┤                │          │        │                   │               │                                                              │
+│ musl-utils   │                │          │        │                   │               │                                                              │
+│              │                │          │        │                   │               │                                                              │
+│              │                │          │        │                   │               │                                                              │
+├──────────────┼────────────────┤          │        ├───────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
+│ nghttp2-libs │ CVE-2026-27135 │          │        │ 1.64.0-r0         │ 1.68.1        │ nghttp2: nghttp2: Denial of Service via malformed HTTP/2     │
+│              │                │          │        │                   │               │ frames after session termination...                          │
+│              │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2026-27135                   │
+├──────────────┼────────────────┤          │        ├───────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
+│ zlib         │ CVE-2026-22184 │          │        │ 1.3.1-r2          │ 1.3.2-r0      │ zlib: zlib: Arbitrary code execution via buffer overflow in  │
+│              │                │          │        │                   │               │ untgz utility                                                │
+│              │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2026-22184                   │
+└──────────────┴────────────────┴──────────┴────────┴───────────────────┴───────────────┴──────────────────────────────────────────────────────────────┘
+
+############ PART 3: Targeted checks against this architecture's own claims
+--- 3.1 No container runs as root
+checkout-fn-5949488f54-4v6mk	true
+checkout-fn-5949488f54-7x89d	true
+gateway-79744d5f8f-8j7ht	true
+gateway-79744d5f8f-bdlgr	true
+inventory-fn-548b5bfb66-7n9hc	true
+inventory-fn-548b5bfb66-dpbzz	true
+postgres-8bf8f9f9b-4tpg5	true
+pricing-fn-84ddfd689b-8rprc	true
+pricing-fn-84ddfd689b-gt4rj	true
+
+--- 3.2 No privilege escalation, all capabilities dropped
+checkout-fn-5949488f54-4v6mk	escalation=false	caps=["ALL"]
+checkout-fn-5949488f54-7x89d	escalation=false	caps=["ALL"]
+gateway-79744d5f8f-8j7ht	escalation=false	caps=["ALL"]
+gateway-79744d5f8f-bdlgr	escalation=false	caps=["ALL"]
+inventory-fn-548b5bfb66-7n9hc	escalation=false	caps=["ALL"]
+inventory-fn-548b5bfb66-dpbzz	escalation=false	caps=["ALL"]
+postgres-8bf8f9f9b-4tpg5	escalation=false	caps=["ALL"]
+pricing-fn-84ddfd689b-8rprc	escalation=false	caps=["ALL"]
+pricing-fn-84ddfd689b-gt4rj	escalation=false	caps=["ALL"]
+
+--- 3.3 Service account tokens not mounted (reduces API blast radius)
+checkout-fn-5949488f54-4v6mk	automount=false
+checkout-fn-5949488f54-7x89d	automount=false
+gateway-79744d5f8f-8j7ht	automount=false
+gateway-79744d5f8f-bdlgr	automount=false
+inventory-fn-548b5bfb66-7n9hc	automount=false
+inventory-fn-548b5bfb66-dpbzz	automount=false
+postgres-8bf8f9f9b-4tpg5	automount=false
+pricing-fn-84ddfd689b-8rprc	automount=false
+pricing-fn-84ddfd689b-gt4rj	automount=false
+
+--- 3.4 Every workload has CPU/memory limits (prevents noisy-neighbour DoS)
+checkout-fn-5949488f54-4v6mk	limits={"cpu":"300m","memory":"192Mi"}
+checkout-fn-5949488f54-7x89d	limits={"cpu":"300m","memory":"192Mi"}
+gateway-79744d5f8f-8j7ht	limits={"cpu":"200m","memory":"128Mi"}
+gateway-79744d5f8f-bdlgr	limits={"cpu":"200m","memory":"128Mi"}
+inventory-fn-548b5bfb66-7n9hc	limits={"cpu":"300m","memory":"192Mi"}
+inventory-fn-548b5bfb66-dpbzz	limits={"cpu":"300m","memory":"192Mi"}
+postgres-8bf8f9f9b-4tpg5	limits={"cpu":"500m","memory":"512Mi"}
+pricing-fn-84ddfd689b-8rprc	limits={"cpu":"300m","memory":"192Mi"}
+pricing-fn-84ddfd689b-gt4rj	limits={"cpu":"300m","memory":"192Mi"}
+
+--- 3.5 Secret is base64 only, NOT encrypted (Lecture 5 caveat, demonstrated)
+   PGPASSWORD retrievable as base64 (32 chars) by any principal holding get-secret RBAC
+   value withheld from this log by design
+   K3s default: secrets are stored unencrypted at rest unless encryption-at-rest is enabled:
+0
+   (flag absent -> encryption at rest NOT enabled)
+
+--- 3.6 No real credentials committed to the repository
+   PASS: no literal credentials in manifests or source
+
+--- 3.7 Pod Security Standard enforced on the namespace
+{"kubernetes.io/metadata.name":"shop","name":"shop","pod-security.kubernetes.io/enforce":"restricted","pod-security.kubernetes.io/enforce-version":"latest"}

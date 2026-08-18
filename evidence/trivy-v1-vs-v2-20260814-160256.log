@@ -1,0 +1,20 @@
+Trivy image scan: v1 (single-stage, npm present) vs v2 (multi-stage, npm removed)
+Date: 2026-08-14T16:02:56Z
+
+IMAGE                        CRITICAL       HIGH
+ead/pricing-fn:v1                   1          6
+ead/inventory-fn:v1                 1          6
+ead/checkout-fn:v1                  1          6
+ead/pricing-fn:v2                   0          0
+ead/inventory-fn:v2                 0          0
+ead/checkout-fn:v2                  0          0
+
+--- Which image is actually running in the cluster:
+checkout-fn  ead/checkout-fn:v2
+gateway  nginxinc/nginx-unprivileged:1.27-alpine
+inventory-fn  ead/inventory-fn:v2
+postgres  postgres:16-alpine
+pricing-fn  ead/pricing-fn:v2
+
+--- Detail of any CRITICAL still present in v2:
+(no output above means no CRITICAL findings in v2)

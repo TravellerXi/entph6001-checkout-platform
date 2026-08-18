@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shop
+  labels:
+    name: shop
+    # Enforce the restricted Pod Security Standard at admission (Lecture 5: safer pod defaults).
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

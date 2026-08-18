@@ -1,0 +1,36 @@
+--- 1. Baseline: every pod Ready, every pod IP present in the Service
+    pricing-fn-84ddfd689b-c4592   10.42.0.67   true   Running
+    pricing-fn-84ddfd689b-dgzdk   10.42.0.72   true   Running
+    pricing-svc endpoints: [10.42.0.67 10.42.0.72]
+    checkout -> HTTP 200
+    rollout strategy: {"maxSurge":"25%","maxUnavailable":"25%"}
+
+--- 2. Break ONLY the readiness probe path (liveness and the process are untouched)
+    waiting for the new pod to settle...
+
+--- 3. Observation A: Running but not Ready
+    pricing-fn-58d5cf59d6-phdmf   10.42.0.86   false   Running
+    pricing-fn-84ddfd689b-c4592   10.42.0.67   true    Running
+    pricing-fn-84ddfd689b-dgzdk   10.42.0.72   true    Running
+
+--- 4. Observation B: the not-Ready pod is withheld from the Service
+    not-Ready pod IP : 10.42.0.86
+    endpoint IPs     : [10.42.0.67 10.42.0.72]
+    RESULT: PASS — the not-Ready pod IP is absent from the endpoint list, so kube-proxy
+            will never route a request to it. Readiness is a traffic gate, not a label.
+    probe failure reported by the kubelet:
+      72s         Warning   Unhealthy   pod/checkout-fn-5949488f54-rgtxb    Readiness probe failed: Get "http://10.42.0.78:3003/health": dial tcp 10.42.0.78:3003: connect: connection refused
+      3s          Warning   Unhealthy   pod/pricing-fn-58d5cf59d6-phdmf     Readiness probe failed: HTTP probe failed with statuscode: 404
+
+--- 5. Observation C: the bad release cannot complete, so users are unaffected
+    rollout status (bounded wait):
+      Waiting for deployment "pricing-fn" rollout to finish: 1 out of 2 new replicas have been updated...
+    deployment: READY=2/2  UP-TO-DATE=1  AVAILABLE=2
+    checkout x10 during the stalled rollout: 200 200 200 200 200 200 200 200 200 200 
+
+--- 6. Repair
+    pricing-fn-58d5cf59d6-phdmf   10.42.0.86   false   Running
+    pricing-fn-84ddfd689b-c4592   10.42.0.67   true    Running
+    pricing-fn-84ddfd689b-dgzdk   10.42.0.72   true    Running
+    pricing-svc endpoints: [10.42.0.67 10.42.0.72]
+    checkout -> HTTP 200

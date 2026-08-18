@@ -1,0 +1,11 @@
+{
+  "name": "inventory-fn",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "main": "app.js",
+  "scripts": { "start": "node app.js" },
+  "dependencies": {
+    "express": "^5.2.1",
+    "pg": "^8.13.1"
+  }
+}

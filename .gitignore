@@ -1,0 +1,12 @@
+# Never commit real secret material. 11-secret.example.yaml carries placeholders only;
+# the live Secret is created at deploy time by 20-create-secret.sh from an environment variable.
+11-secret.yaml
+*.env
+.env
+kubeconfig
+*.kubeconfig
+
+node_modules/
+npm-debug.log*
+.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+======== A. WITHOUT rate limiting
+--- no rate limit: 30 concurrent requests
+         30 200
+    admitted=30  p95_latency_of_admitted=0.168s
+
+======== B. WITH rate limiting (average=5, burst=10)
+{"average":5,"burst":10}
+--- rate limited: 30 concurrent requests
+         19 429
+         11 200
+    admitted=11  p95_latency_of_admitted=0.075s
+
+======== Interpretation
+429 responses are the admission control working: excess load is refused at the edge
+instead of being queued through the gateway into checkout, pricing and the database.

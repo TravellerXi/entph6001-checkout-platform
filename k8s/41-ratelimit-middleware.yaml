@@ -1,0 +1,17 @@
+# Edge admission control (Lab 11 §11.4).
+#
+# Rate limiting is not only abuse prevention: it is an admission controller and a fairness
+# mechanism. Rejecting some traffic early protects backend health and preserves latency for the
+# requests that are admitted, which matters more than accepting every request (Lecture 9,
+# load shedding; Google SRE on handling overload).
+#
+# average 5 / burst 10 is deliberately low so the control is demonstrable in a lab.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: checkout-ratelimit
+  namespace: shop
+spec:
+  rateLimit:
+    average: 5
+    burst: 10

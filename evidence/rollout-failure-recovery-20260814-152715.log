@@ -1,0 +1,46 @@
+--- 1. Healthy baseline
+    READY=2/2  AVAILABLE=2
+    deployment.apps/checkout-fn 
+    REVISION  CHANGE-CAUSE
+    1         <none>
+    3         <none>
+    4         <none>
+    
+
+--- 2. Deploy a broken image tag
+    rollout status (bounded wait, expected to NOT complete):
+      Waiting for deployment "checkout-fn" rollout to finish: 0 out of 2 new replicas have been updated...
+      Waiting for deployment "checkout-fn" rollout to finish: 1 out of 2 new replicas have been updated...
+    exit code from rollout status: 124  (non-zero = the platform refused to finish the release)
+
+--- 3. Availability DURING the failed rollout
+    (paced at ~3 req/s to stay under the edge rate limit of average=5, so that any
+     non-200 here is attributable to the rollout and not to admission control)
+    responses: 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 
+    200=15/15   429(rate-limited)=0   other=0
+    <-- old ReplicaSet still serving; users never saw the bad build
+
+--- 4. Diagnosis from the cluster, not from guesswork
+    checkout-fn-5949488f54-kxs2g   1/1   Running        0     40m
+    checkout-fn-5949488f54-tqmzp   1/1   Running        0     40m
+    checkout-fn-699f66c9db-wjvk6   0/1   ErrImagePull   0     65s
+    pod events:
+            Reason:       ErrImagePull
+    replicaset view (new RS cannot become available):
+      checkout-fn-5949488f54  DESIRED=2  CURRENT=2  READY=2
+      checkout-fn-699f66c9db  DESIRED=1  CURRENT=1  READY=0
+      checkout-fn-76b747ff7d  DESIRED=0  CURRENT=0  READY=0
+
+--- 5. Roll back
+Warning: resource deployments/checkout-fn was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.
+    deployment "checkout-fn" successfully rolled out
+    rollback completed in 0s
+    READY=2/2  AVAILABLE=2
+    image now: ead/checkout-fn:v2
+    checkout -> HTTP 200
+    deployment.apps/checkout-fn 
+    REVISION  CHANGE-CAUSE
+    1         <none>
+    5         <none>
+    6         <none>
+    
