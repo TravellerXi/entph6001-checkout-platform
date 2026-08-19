@@ -10,3 +10,16 @@ node_modules/
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# Review and audit working files. These record what was wrong and how it was found, so they
+# belong outside anything that gets packaged. Listed here as a backstop in case one is ever
+# written into this tree by mistake.
+audit-v*.md
+read-v*.md
+edits-v*.md
+judge-v*.md
+critic-v*.md
+fact-check-v*.md
+rubric-audit-v*.md
+deadlock-*.md
+draft-v*.md
