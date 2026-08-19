@@ -233,7 +233,7 @@ callers; rejection concentrates it on some.
 A fourth set asked what happens when a *change* is wrong rather than a dependency slow. A broken
 readiness path, a broken image tag, and the gateway upstream reverted to its Compose name were
 injected separately (Appendix C3–C5). All three were contained by the readiness gate a replica
-must pass before receiving traffic, and user-visible impact was nil: 10/10,
+must pass before receiving traffic, and user-visible impact was unobserved: 10/10,
 15/15 and 5/5 checkouts returned 200. Operators saw the failure; users did not, so a broken release
 can sit unnoticed unless rollout state is alerted on.
 
@@ -297,8 +297,9 @@ Two trade-offs were accepted deliberately. A service mesh would supply mTLS, ret
 uniformly, but for four services it adds a control plane and sidecar overhead this organisation
 cannot operate; NetworkPolicy plus application timeouts covers most of the benefit far more
 cheaply. Scale-to-zero was rejected because cold starts would add latency to the checkout path and
-idle cost is not the constraint at this size. A third alternative, asynchronous messaging, is notsettled. The two dependencies are called in parallel, so tail latency is bounded by the slower
-rather than their sum; what is still coupled is availability. The degraded response returned when
+idle cost is not the constraint at this size. A third alternative, asynchronous messaging, is not
+settled. The two dependencies are called in parallel, so tail latency is bounded by the slower, not
+their sum; what is still coupled is availability. The degraded response returned when
 inventory is unavailable is a promise to confirm stock later, and nothing records or honours it. A
 durable queue with idempotent consumers and a dead-letter path is the standard remedy, rejected
 because a stateful broker would add a second single point of failure on one node. The promise
