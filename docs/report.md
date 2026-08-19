@@ -4,7 +4,7 @@
 
 **Submission:** Cloud-native architecture for a small e-commerce checkout platform
 
-**Word count (Sections 1–5, excluding figures, references and appendices):** 1993
+**Word count (Sections 1–5, excluding figures, references and appendices):** 1994
 
 **Repository:** https://github.com/TravellerXi/entph6001-checkout-platform
 
@@ -227,8 +227,8 @@ A third experiment tests admission control, which is load shedding at the edge. 
 without the rate-limit middleware (Traefik Labs, 2026) admitted all 30 at a p95 of 0.168 s; with
 it, 11 were admitted and 19 refused with HTTP 429, and the admitted requests completed at a p95 of
 0.075 s. The two samples differ in size and selection, so this shows the direction of the effect
-rather than its magnitude (Appendix C1): admitting everything degrades everyone, whereas early
-rejection keeps the backend out of contention.
+rather than its magnitude (Appendix C1): admitting everything spreads the delay across all
+callers; rejection concentrates it on some.
 
 A fourth set asked what happens when a *change* is wrong rather than a dependency slow. A broken
 readiness path, a broken image tag, and the gateway upstream reverted to its Compose name were
@@ -255,9 +255,9 @@ holding database credentials. NetworkPolicy objects are silently inert without a
 CNI, so the negative controls prove enforcement rather than intent. DNS is the one exception;
 without it service discovery fails and the outage looks like an application bug.
 
-The limits matter as much as the result. The 19 cases cover four workloads, not Postgres; node
-traffic is always permitted regardless of policy; and NetworkPolicy records nothing about what it
-allowed or blocked, so this control has no audit trail. It isolates reachability, nothing more.
+The limits matter as much as the result. No probe starts from Postgres, so its egress policy is
+untested; node traffic is permitted regardless of policy; and NetworkPolicy records nothing about
+what it allowed or blocked, so this control has no audit trail. It isolates reachability only.
 
 **Security validation 2 — configuration and image posture.** `kubesec` (Controlplane, 2026) scores
 all five Deployments, read from the live cluster so the score describes what actually runs. The
