@@ -4,7 +4,7 @@
 
 **Submission:** Cloud-native architecture for a small e-commerce checkout platform
 
-**Word count (Sections 1–5, excluding figures, references and appendices):** 1993
+**Word count (Sections 1–5, excluding figures, references and appendices):** 1992
 
 **Repository:** https://github.com/TravellerXi/entph6001-checkout-platform
 
@@ -241,7 +241,7 @@ can sit unnoticed unless rollout state is alerted on.
 
 **Observability.** The three application services emit structured JSON with a shared `request_id`,
 and `checkout-fn` adds per-dependency `duration_ms`. One request is traceable across all three, and
-the per-hop timings identified the timeout as the binding constraint in Section 3. This is
+the per-hop timings identified the timeout as the cause in Section 3. This is
 deliberately log-based rather than a full tracing stack: on one node, correlation IDs deliver
 most of the diagnostic value far more cheaply (Appendix A). The limitation is real: no sampling,
 retention, aggregation or dashboard.
