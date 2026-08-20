@@ -4,7 +4,7 @@
 
 **Submission:** Cloud-native architecture for a small e-commerce checkout platform
 
-**Word count (Sections 1–5, excluding figures, references and appendices):** 1994
+**Word count (Sections 1–5, excluding figures, references and appendices):** 1993
 
 **Repository:** https://github.com/TravellerXi/entph6001-checkout-platform
 
@@ -210,7 +210,7 @@ bounds the cost of degradation without describing it.
 
 Both claims hold: the non-critical dependency degrades rather than rejecting the customer, and the
 critical one fails fast at the configured budget. The measured
-1502/1504 ms confirms the 1500 ms timeout is the binding constraint, not an accident of network
+1502/1504 ms confirms that when a dependency hangs, the 1500 ms timeout binds rather than network
 timing. The cost is visible too: when the budget binds, degradation turns an 11 ms response into
 a 1502 ms one. Under sustained failure that consumes connection capacity (Google,
 2016); a circuit breaker is the correct next step (Fowler, 2014).
@@ -266,8 +266,8 @@ capabilities, read-only root filesystem, resource limits, dedicated identities, 
 automounting. Postgres scores **11**, missing only `ReadOnlyRootFilesystem`. Trivy (Aqua Security,
 2026) reported 1 CRITICAL and 6
 HIGH per service image, including CVE-2026-59873 in `node-tar`. Interpretation mattered more than
-the count: every finding came from the npm CLI in the base image, not application dependencies, and
-was unreachable at runtime. Rather than suppress them, the images were rebuilt multi-stage without
+the count: every finding came from the npm CLI in the base image, not application dependencies;
+runtime reachability was untested. Rather than suppress them, the images were rebuilt multi-stage without
 the package manager; the same scan returns **0 CRITICAL and 0 HIGH** (Appendix F).
 
 **Prioritised issues**, ordered by how easily each is exploited without credentials. (1) Secrets
