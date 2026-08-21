@@ -8,7 +8,7 @@
 
 **Repository:** https://github.com/TravellerXi/entph6001-checkout-platform
 
-**Screencast:** `screencast.mp4`, submitted alongside this report (see `docs/screencast-script.md`)
+**Screencast:** `screencast.mp4`, submitted alongside this report
 
 ---
 
