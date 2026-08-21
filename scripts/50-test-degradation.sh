@@ -23,6 +23,31 @@ wait_ready() {
   kubectl -n shop rollout status "deployment/$1" --timeout=120s >/dev/null
 }
 
+# A rolling update reports success while the previous pods are still draining, and this deployment
+# has a preStop delay plus a 30s grace period. During that window the Service still routes to the
+# old pods, so an env change can look applied while requests are still served by the old value.
+# Wait until the value is live on every endpoint actually backing the Service.
+wait_env_live() {   # deployment service env_name expected_value
+  local dep="$1" svc="$2" name="$3" want="$4" i served p v ok
+  kubectl -n shop rollout status "deployment/${dep}" --timeout=180s >/dev/null
+  for i in $(seq 1 90); do
+    served=$(kubectl -n shop get endpointslice -l "kubernetes.io/service-name=${svc}" \
+             -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"\n"}{end}' 2>/dev/null)
+    if [ -n "$served" ]; then
+      ok=1
+      for p in $served; do
+        v=$(kubectl -n shop get pod "$p" \
+            -o jsonpath="{.spec.containers[0].env[?(@.name=='${name}')].value}" 2>/dev/null || echo "")
+        [ "$v" = "$want" ] || ok=0
+      done
+      [ "$ok" = "1" ] && return 0
+    fi
+    sleep 2
+  done
+  echo "WARNING: ${name}=${want} is not live on every ${svc} endpoint; the next result is not trustworthy"
+  return 1
+}
+
 {
 echo "================ PHASE 1: baseline (all dependencies healthy)"
 call "deg-baseline"
@@ -45,14 +70,17 @@ call "deg-inventory-restored"
 echo
 echo "================ PHASE 4: pricing-fn made slow (3000ms > TIMEOUT_MS 1500ms)"
 kubectl -n shop set env deployment/pricing-fn DELAY_MS=3000 >/dev/null
-wait_ready pricing-fn
+wait_env_live pricing-fn pricing-svc DELAY_MS 3000
+echo "-- pods now serving pricing-svc:"
+kubectl -n shop get endpointslice -l kubernetes.io/service-name=pricing-svc \
+  -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"\n"}{end}'
 echo "-- checkout request with pricing exceeding the timeout budget:"
 call "deg-pricing-slow"
 
 echo
 echo "================ PHASE 5: pricing-fn latency removed"
 kubectl -n shop set env deployment/pricing-fn DELAY_MS=0 >/dev/null
-wait_ready pricing-fn
+wait_env_live pricing-fn pricing-svc DELAY_MS 0
 call "deg-recovered"
 
 echo

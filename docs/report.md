@@ -1,5 +1,9 @@
 # Enterprise Architecture Design — Supplemental Assignment
 
+**Name:** Xi Yu
+
+**Student ID:** X00231097
+
 **Module:** ENTPH6001 Enterprise Architecture Design
 
 **Submission:** Cloud-native architecture for a small e-commerce checkout platform
